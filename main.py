@@ -1,10 +1,10 @@
 import boto3
 from mangaba import Agent, Task, Crew, Process
 
-GEMINI_KEY = 'sua chave_api_google_gemini_aqui'
+GEMINI_KEY = 'sua-chave-api-gemini-aqui' #voce pode usar a gemini para gerar o relatorio final, mas isso é opcional. Se quiser, pode usar outra LLM ou até mesmo escrever o relatorio manualmente com base nos resultados da auditoria.
 
-AWS_KEY    = 'sua chave_aws_aqui'
-AWS_SECRET = 'sua chave_secreta_aws_aqui'
+AWS_KEY    = 'sua-chave-acesso-aws-aqui' # Substitua pela sua acess key AWS. Lembre-se de manter essas chaves seguras e nunca compartilhá-las publicamente.
+AWS_SECRET = 'sua-chave-secreta-aws-aqui' # Substitua pela sua secret key AWS. Lembre-se de manter essas chaves seguras e nunca compartilhá-las publicamente.
 
 session = boto3.Session(
     aws_access_key_id=AWS_KEY,
@@ -83,22 +83,26 @@ if not encontrou:
 
 print("\n=== Gerando relatorio com IA ===\n")
 
+dados = "\n".join(resultados)
+
 analista = Agent(
     role="Analista de Segurança",
     goal="Analisar resultados de auditoria AWS e gerar relatório claro em português",
     backstory="Especialista em segurança cloud com 10 anos de experiência",
     llm="google",
     api_key=GEMINI_KEY
+    
 )
 
 
 dados = "\n".join(resultados)
 
 tarefa = Task(
-    description=f"Analise esses resultados de auditoria AWS e escreva um relatório em português simples explicando o que foi encontrado e o que fazer para corrigir:\n\n{dados}",
-    expected_output="Relatório de segurança em português com problemas encontrados e recomendações",
+    description=f"Com base nesses resultados de auditoria AWS, escreva um relatório CURTO em português com no máximo 5 linhas. Diga o que foi encontrado e se há algum problema. Resultados:\n\n{dados}",
+    expected_output="Relatório curto de segurança em português",
     agent=analista
 )
+
 
 crew = Crew(
     agents=[analista],
@@ -108,3 +112,8 @@ crew = Crew(
 
 resultado = crew.kickoff()
 print(resultado.final_output)
+
+with open("relatorio.txt", "w", encoding="utf-8") as f:
+    f.write(resultado.final_output)
+
+print("\nRelatório salvo em relatorio.txt")

@@ -1,0 +1,1 @@
+A auditoria de segurança AWS confirmou que 'teste-secaudit-ai' está privado, não há usuários com acesso indevido e nenhuma porta perigosa aberta. Todos os itens verificados estão em conformidade. Não foram encontrados problemas de segurança.
