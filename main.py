@@ -1,8 +1,8 @@
 import boto3
 
 session = boto3.Session(
-    aws_access_key_id='SUA-ACCESS-KEY',
-    aws_secret_access_key='SUA-SECRET-KEY',
+    aws_access_key_id='AKIAW4T64QTXZLGFWZF5',
+    aws_secret_access_key='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',
     region_name='us-east-1' #muda pra region_name='sa-east-1' se quer a região aqui do brasil, em sao paulo
 )
 
@@ -30,3 +30,19 @@ for bucket in resposta['Buckets']:
     
     except Exception as e:
         print(f"ERRO   - {nome}: {e}")
+
+print("\n*** Auditoria de Usuarios IAM ***\n")
+
+iam = session.client('iam')
+usuarios = iam.list_users()
+
+for usuario in usuarios['Users']:
+    nome = usuario['UserName']
+    policies = iam.list_attached_user_policies(UserName=nome)
+    
+    for policy in policies['AttachedPolicies']:
+        if policy['PolicyName'] == 'AdministratorAccess':
+            print(f"ATENCAO - {nome} tem acesso total (AdministratorAccess)")
+    
+    if not policies['AttachedPolicies']:
+        print(f"OK      - {nome} sem policies diretas")
