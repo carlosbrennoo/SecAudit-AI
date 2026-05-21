@@ -1,10 +1,22 @@
 import boto3
 from mangaba import Agent, Task, Crew, Process
 
-GEMINI_KEY = 'sua-chave-api-gemini-aqui' #voce pode usar a gemini para gerar o relatorio final, mas isso é opcional. Se quiser, pode usar outra LLM ou até mesmo escrever o relatorio manualmente com base nos resultados da auditoria.
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
-AWS_KEY    = 'sua-chave-acesso-aws-aqui' # Substitua pela sua acess key AWS. Lembre-se de manter essas chaves seguras e nunca compartilhá-las publicamente.
-AWS_SECRET = 'sua-chave-secreta-aws-aqui' # Substitua pela sua secret key AWS. Lembre-se de manter essas chaves seguras e nunca compartilhá-las publicamente.
+"""Abaixo tem onde o codigo vai pegar as credenciais, cria no seu editor um arquivo chamado ".env" e põe isso nele: 
+
+    GEMINI_KEY=sua_chave_gemini_aqui
+    AWS_KEY=sua_chave_aws_aqui
+    AWS_SECRET=sua_chave_secreta_aws_aqui
+
+E substitua os valores pelas suas chaves. O código vai ler essas variáveis de ambiente e usar para acessar a API do Gemini e da AWS. Nunca compartilhe essas chaves publicamente! Elas dão acesso total à sua conta. Se alguém tiver acesso a elas, pode causar muitos danos. Mantenha-as seguras e privadas.
+"""
+
+GEMINI_KEY = os.getenv('GEMINI_KEY')
+AWS_KEY = os.getenv('AWS_KEY')
+AWS_SECRET = os.getenv('AWS_SECRET')
 
 session = boto3.Session(
     aws_access_key_id=AWS_KEY,
@@ -14,7 +26,7 @@ session = boto3.Session(
 
 resultados = []
 
-print("=== Auditoria de Buckets S3 ===\n")
+print("*** Analisando Buckets S3 ***\n")
 s3 = session.client('s3')
 resposta = s3.list_buckets()
 encontrou = False
@@ -28,18 +40,18 @@ for bucket in resposta['Buckets']:
                 if 'AllUsers' in permissao['Grantee']['URI']:
                     publico = True
         if publico:
-            msg = f"PERIGO - {nome} esta PUBLICO"
+            msg = f"PERIGO! {nome} esta PUBLICO"
         else:
-            msg = f"OK     - {nome} esta privado"
+            msg = f"TUDO CERTO! {nome} esta privado"
         print(msg)
         resultados.append(msg)
         encontrou = True
     except Exception as e:
-        print(f"ERRO   - {nome}: {e}")
+        print(f"ALGO ERRADO, {nome}: {e}")
 if not encontrou:
     resultados.append("S3: nenhum bucket encontrado")
 
-print("\n=== Auditoria de Usuarios IAM ===\n")
+print("\n*** Analisando Usuarios IAM ***\n")
 iam = session.client('iam')
 usuarios = iam.list_users()
 encontrou = False
@@ -48,21 +60,21 @@ for usuario in usuarios['Users']:
     policies = iam.list_attached_user_policies(UserName=nome)
     for policy in policies['AttachedPolicies']:
         if policy['PolicyName'] == 'AdministratorAccess':
-            msg = f"PERIGO - {nome} tem acesso total"
+            msg = f"PERIGO! {nome} tem acesso total"
             print(msg)
             resultados.append(msg)
             encontrou = True
     if not policies['AttachedPolicies']:
-        msg = f"OK     - {nome} sem policies diretas"
+        msg = f"TUDO CERTO! {nome} sem policies diretas"
         print(msg)
         resultados.append(msg)
         encontrou = True
 if not encontrou:
-    msg = "OK - Nenhum usuario com acesso indevido"
+    msg = "Tudo certo por aqui! Nenhum usuario com acesso indevido"
     print(msg)
     resultados.append(msg)
 
-print("\n=== Auditoria de Security Groups ===\n")
+print("\n*** Analisando Security Groups ***\n")
 ec2 = session.client('ec2')
 grupos = ec2.describe_security_groups()
 encontrou = False
@@ -72,16 +84,16 @@ for grupo in grupos['SecurityGroups']:
         for ip in regra.get('IpRanges', []):
             if ip['CidrIp'] == '0.0.0.0/0':
                 porta = regra.get('FromPort', 'todas')
-                msg = f"PERIGO - {nome} com porta {porta} aberta"
+                msg = f"PERIGO! {nome} com porta {porta} aberta"
                 print(msg)
                 resultados.append(msg)
                 encontrou = True
 if not encontrou:
-    msg = "OK - Nenhuma porta perigosa aberta"
+    msg = "Tudo certo por aqui! Nenhuma porta perigosa aberta"
     print(msg)
     resultados.append(msg)
 
-print("\n=== Gerando relatorio com IA ===\n")
+print("\n*** Gerando relatorio da análise ***\n")
 
 dados = "\n".join(resultados)
 
@@ -98,7 +110,7 @@ analista = Agent(
 dados = "\n".join(resultados)
 
 tarefa = Task(
-    description=f"Com base nesses resultados de auditoria AWS, escreva um relatório CURTO em português com no máximo 5 linhas. Diga o que foi encontrado e se há algum problema. Resultados:\n\n{dados}",
+    description=f"Com base nesses resultados de auditoria AWS, escreva um relatório preciso e claro em português com no máximo 10 linhas. Diga o que foi encontrado e se há algum problema. Resultados:\n\n{dados}",
     expected_output="Relatório curto de segurança em português",
     agent=analista
 )
