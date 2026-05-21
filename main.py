@@ -149,6 +149,7 @@ for evento in eventos['Events']:
         print(msg)
         resultados.append(msg)
         encontrou = True
+        
 for ips in eventos['Events']:
     if 'SourceIPAddress' in ips:
         ip = ips['SourceIPAddress']
@@ -158,6 +159,17 @@ for ips in eventos['Events']:
         print(msg)
         resultados.append(msg)
         encontrou = True
+
+for acesso in eventos['Events']:
+    nome_evento = acesso['EventName']
+    if nome_evento == 'ConsoleLogin':
+        detalhes = acesso['CloudTrailEvent']
+        if '"errorMessage": "Failed authentication"' in detalhes:
+            usuario = acesso.get('Username', 'sistema')
+            msg = f"ALERTA! Tentativa de login falhada por {usuario}"
+            print(msg)
+            resultados.append(msg)
+            encontrou = True
 if not encontrou:
     msg = "Tudo certo por aqui! Nenhum evento suspeito nos ultimos 24 horas"
     print(msg)
