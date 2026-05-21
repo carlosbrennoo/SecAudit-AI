@@ -1,3 +1,9 @@
 **Relatório de Auditoria de Segurança AWS**
 
-A auditoria de segurança da AWS verificou que o recurso 'teste-secaudit-ai' está configurado como privado. Não foram identificados usuários com acesso indevido e nenhuma porta perigosa foi encontrada aberta. Conclui-se que todos os itens auditados estão em conformidade e nenhum problema de segurança foi detectado.
+A auditoria de segurança AWS foi concluída com sucesso, abrangendo as seguintes áreas:
+*   O bucket S3 "teste-secaudit-ai" está configurado como privado.
+*   Não foram identificados usuários com acesso indevido.
+*   Nenhuma chave de acesso problemática foi detectada.
+*   Não há portas perigosas abertas nos recursos avaliados.
+
+**Conclusão:** Não foram encontrados problemas de segurança. Todos os itens verificados estão em conformidade.

@@ -1,9 +1,11 @@
 import boto3
 from mangaba import Agent, Task, Crew, Process
-
+import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
 load_dotenv()
+encontrou = False
 
 """Abaixo tem onde o codigo vai pegar as credenciais, cria no seu editor um arquivo chamado ".env" e põe isso nele: 
 
@@ -74,6 +76,32 @@ if not encontrou:
     print(msg)
     resultados.append(msg)
 
+print("\n *** Analisando chaves de acesso ***\n")
+credenciais = iam.list_users()
+for usuario in credenciais['Users']:
+    nome = usuario['UserName']
+    mfa = iam.list_mfa_devices(UserName=nome)
+    if not mfa['MFADevices']:
+        msg = f"PERIGO! {nome} não tem MFA ativado"
+        print(msg)
+        resultados.append(msg)
+        encontrou = True
+    chaves = iam.list_access_keys(UserName=nome)
+    for chave in chaves['AccessKeyMetadata']:
+        if chave['Status'] == 'Active':
+            data_criacao = chave['CreateDate']
+            agora = datetime.now(timezone.utc)
+            idade = (agora - data_criacao).days
+            if idade > 90:
+                msg = f"PERIGO! {nome} tem chave ativa com {idade} dias"
+                print(msg)
+                resultados.append(msg)
+                encontrou = True
+if not encontrou:
+    msg = "Tudo certo por aqui! Nenhuma chave de acesso com problemas"
+    print(msg)
+    resultados.append(msg)
+
 print("\n*** Analisando Security Groups ***\n")
 ec2 = session.client('ec2')
 grupos = ec2.describe_security_groups()
@@ -111,7 +139,7 @@ dados = "\n".join(resultados)
 
 tarefa = Task(
     description=f"Com base nesses resultados de auditoria AWS, escreva um relatório preciso e claro em português com no máximo 10 linhas. Diga o que foi encontrado e se há algum problema. Resultados:\n\n{dados}",
-    expected_output="Relatório curto de segurança em português",
+    expected_output="Relatório completo de segurança em português",
     agent=analista
 )
 
