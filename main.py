@@ -149,6 +149,15 @@ for evento in eventos['Events']:
         print(msg)
         resultados.append(msg)
         encontrou = True
+for ips in eventos['Events']:
+    if 'SourceIPAddress' in ips:
+        ip = ips['SourceIPAddress']
+        if ip.startswith('192.168') or ip.startswith('10.') or ip.startswith('172.16'):
+            continue
+        msg = f"ALERTA! Acesso suspeito de IP publico: {ip}"
+        print(msg)
+        resultados.append(msg)
+        encontrou = True
 if not encontrou:
     msg = "Tudo certo por aqui! Nenhum evento suspeito nos ultimos 24 horas"
     print(msg)
