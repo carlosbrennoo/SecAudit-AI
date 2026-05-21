@@ -4,6 +4,7 @@ import datetime
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
 load_dotenv()
 encontrou = False
 
@@ -42,12 +43,21 @@ for bucket in resposta['Buckets']:
                 if 'AllUsers' in permissao['Grantee']['URI']:
                     publico = True
         if publico:
-            msg = f"PERIGO! {nome} esta PUBLICO"
+            msg = f"[CRITICO] {nome} esta PUBLICO"
         else:
             msg = f"TUDO CERTO! {nome} esta privado"
         print(msg)
         resultados.append(msg)
         encontrou = True
+        try:
+            criptografia = s3.get_bucket_encryption(Bucket=nome)
+            msg = f"TUDO CERTO! {nome} tem criptografia ativada"
+            print(msg)
+            resultados.append(msg)
+        except:
+            msg = f"[MEDIO] {nome} sem criptografia ativada"
+            print(msg)
+            resultados.append(msg)
     except Exception as e:
         print(f"ALGO ERRADO, {nome}: {e}")
 if not encontrou:
@@ -62,7 +72,7 @@ for usuario in usuarios['Users']:
     policies = iam.list_attached_user_policies(UserName=nome)
     for policy in policies['AttachedPolicies']:
         if policy['PolicyName'] == 'AdministratorAccess':
-            msg = f"PERIGO! {nome} tem acesso total"
+            msg = f"[MEDIO] {nome} tem acesso total"
             print(msg)
             resultados.append(msg)
             encontrou = True
@@ -121,9 +131,37 @@ if not encontrou:
     print(msg)
     resultados.append(msg)
 
+print("\n*** Analisando logs do CloudTrail ***\n")
+cloudtrail = session.client('cloudtrail')
+logs = cloudtrail.list_trails()
+encontrou = False
+
+inicio = datetime.now(timezone.utc) - timedelta(hours=24)
+
+eventos = cloudtrail.lookup_events(
+    StartTime=inicio
+)
+for evento in eventos['Events']:
+    nome_evento = evento['EventName']
+    usuario = evento.get('Username', 'sistema')
+    if nome_evento in ['CreateUser', 'DeleteUser', 'AttachUserPolicy', 'DetachUserPolicy']:
+        msg = f"ALERTA! Evento {nome_evento} por {usuario}"
+        print(msg)
+        resultados.append(msg)
+        encontrou = True
+if not encontrou:
+    msg = "Tudo certo por aqui! Nenhum evento suspeito nos ultimos 24 horas"
+    print(msg)
+    resultados.append(msg)
+
+
 print("\n*** Gerando relatorio da análise ***\n")
 
-dados = "\n".join(resultados)
+criticos = [r for r in resultados if '[CRITICO]' in r]
+medios = [r for r in resultados if '[MEDIO]' in r]
+
+resumo = f"Total de problemas criticos: {len(criticos)}\nTotal de problemas medios: {len(medios)}\n\nDetalhes:\n"
+dados = resumo + "\n".join(resultados)
 
 analista = Agent(
     role="Analista de Segurança",
