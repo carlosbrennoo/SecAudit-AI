@@ -175,8 +175,40 @@ if not encontrou:
     print(msg)
     resultados.append(msg)
 
+for acesso in eventos['Events']:
+    horario = acesso['EventTime']
+    hora  = horario.hour
+    if hora >= 0 and hora <= 6:
+        nome_evento = acesso['EventName']
+        usuario = acesso.get('Username', 'sistema')
+        msg = f"ALERTA! Evento {nome_evento} por {usuario} em horario suspeito: {horario}"
+        print(msg)
+        resultados.append(msg)
+        encontrou = True
+if not encontrou:
+    msg = "Tudo certo por aqui! Nenhum evento em horario suspeito"
+    print(msg)
+    resultados.append(msg)
 
-print("\n*** Gerando relatorio da análise ***\n")
+print("\n*** Verificando monitoramento e alertas ***\n")
+ec2 = session.client('ec2')
+instancias = ec2.describe_instances()
+encontrou = False
+for reserva in instancias['Reservations']:
+    for instancia in reserva['Instances']:
+        id = instancia['InstanceId']
+        nome = next((tag['Value'] for tag in instancia.get('Tags', []) if tag['Key'] == 'Name'), id)
+        if 'Monitoring' in instancia and instancia['Monitoring']['State'] != 'enabled':
+            msg = f"SE LIGA! {nome} com monitoramento desativado"
+            print(msg)
+            resultados.append(msg)
+            encontrou = True
+if not encontrou:
+    msg = "Tudo certo por aqui! Todas as instancias com monitoramento ativado"
+    print(msg)
+    resultados.append(msg)
+
+print("\n*** Análise completa! Gerando relatório ***\n")
 
 criticos = [r for r in resultados if '[CRITICO]' in r]
 medios = [r for r in resultados if '[MEDIO]' in r]
