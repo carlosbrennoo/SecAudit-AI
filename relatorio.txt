@@ -1,4 +1,3 @@
-Relatório de Auditoria de Segurança AWS
+**Relatório de Auditoria AWS:**
 
-A auditoria AWS identificou uma configuração de segurança geralmente robusta.
-Os buckets 'aws-cloudtrail-logs...' e 'teste-seca
+A auditoria não encontrou problemas críticos, mas identificou um problema médio: o usuário "Carlos" possui acesso total. Foram registrados 43 alertas
