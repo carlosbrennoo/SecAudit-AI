@@ -1,30 +1,23 @@
- **Relatório de Auditoria de Segurança AWS**
+ **Relatório de auditoria de segurança AWS**
 
 **Resumo Executivo:**
-O relatório apresenta uma quantidade total de 19 itens que se encaixam dentro dos níveis de alarme (18) e médio (1). Não existem itens críticos ou perigosos. É urgentemente necessário analisar detalhadamente os acontecimentos suspeitos registrados no log CloudTrail e tomar medidas para reduzir a exposição de recursos e acesso de usuários de forma precária.
+Na auditoria de segurança realizada em nossos recursos AWS, foram encontrados 19 alertas, não houve problemas críticos nem perigos. A seguir, o detalhamento por seção com os res respectivos problemas e riscos associados, além das ações corretivas recomendadas.
 
-**Detalhamento por seção:**
+**Monitoramento EC2:** Não existem problemas e todas as instâncias possuem o monitoramento ativado (OK).
 
-=== Security Groups ===
-- [OK] Nenhuma porta perigosa aberta nenhum dos security groups analisados. Segurança é considerada boa na configuração dessa seção.
+**Security Groups:** Nenhuma porta perigosa está aberta (OK).
 
-=== Monitoramento EC2 ===
-- [OK] Todas as instâncias com monitoramento ativado, o que mostra que o sistema está seguranço e está sendo observado adequadamente.
+**Permissões IAM:** Carlos possui permissão AdministratorAccess (Médio):
+- Riscos: Acesso excessivo por parte de um usuário, que pode criar um risco significativo para a integridade, confidentialidade e disponibilidade dos recursos da empresa.
+- Ações corretivas recomendadas: Examinar as políticas IAM atualmente implementadas, revisar as permissões de acesso do usuário Carlos e garantir a implementação de um mínimo de privilégios necessários (Principio de menos privilégios).
 
-=== Permissões IAM ===
-- [MEDIO] O usuário Carlos tem acesso AdministratorAccess, uma permissão de administração extremamente poderosa. Esse nível de permissão pode representar um risco potencial para a segurança da plataforma se o usuário não estiver seguindo práticas de segurança rigorosas.
+**Logs CloudTrail:** Em uma 24h de perfil, houve 19 operações suspeitas por parte do utilizador Carlos (ALERTA):
+- Riscos: Excesso e uso indevido dos logs de auditoria, que podem resultar em uma violação da proteção dos dados sensíveis.
+- Ações corretivas recomendadas: Realizar uma análise detalhada das operações suspeitas, identificando possíveis atividades maliciosas e tomar medidas de segurança adicionais, como inserção de política na CloudTrail para auditar a sua própria política.
 
-=== Logs CloudTrail (últimas 24h) ===
-- [ALERTA] A maioria dos acontecimentos no log CloudTrail apresenta operações realizadas em tempos suspeitos, com a grande maioria deles sendo por um usuário chamado Carlos. Essas operações podem indicar infiltração ou atividade mal-intencionada, e devem ser investigadas urgentemente.
+**Autenticação e Chaves (OWASP A07):** Não existem problemas na autenticação e chaves de acesso (OK).
 
-=== Autenticação e Chaves (OWASP A07) ===
-- [OK] Nenhuma chave de acesso apresenta problemas em relação à sua segurança. Essa configuração é considerada boa e não requer intervenção imediata.
+**Buckets S3:**
+- aws-cloudtrail-logs-473786254575-8cdea241: privado e criptografia ativada (OK); teste-secaudit-ai: privado e criptografia ativada (OK).
 
-=== Buckets S3 ===
-- [OK] Os buckets aws-cloudtrail-logs-473786254575-8cdea241 e teste-secaudit-ai apresentam configurações de segurança adequadas, sendo privados e com a criptografia ativada.
-
-**Ações Corretivas Recomendadas:**
-
-1. Revisão das permissões de usuários - Desaconselhável que Carlos tenha acesso AdministratorAccess. Esse nível de permissão deveria ser revisto e reduzido imediatamente, com permissões mais limitadas sendo concedidas ao necessário.
-2. Análise forense do log CloudTrail - É urgente tomar medidas para investigar as operações suspeitas realizadas em horários suspeitos e tentar descobrir a origem e finalidade delas. Atenção especial deve ser dada ao fato de haver muitos de tais eventos ocorrendo por Carlos.
-3. Monitoramento contínuo - Realizar monitoramento constante da segurança da plataforma AWS, a fim de detectar e respondere às atividades suspeitas ou anormalmente rápidas com eficiência.
+**Obs:** Verifique que a prática de segurança do OWASP não está mais completa, pois o relatório apresentado não possui dados necessários para essa verificação.
