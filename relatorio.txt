@@ -1,23 +1,62 @@
- **Relatório de auditoria de segurança AWS**
+ RELATÓRIO DE AVALIAÇÃO DE SEGURANÇA AWS
+==========================================
 
-**Resumo Executivo:**
-Na auditoria de segurança realizada em nossos recursos AWS, foram encontrados 19 alertas, não houve problemas críticos nem perigos. A seguir, o detalhamento por seção com os res respectivos problemas e riscos associados, além das ações corretivas recomendadas.
+RESUMENOS GERAL:
 
-**Monitoramento EC2:** Não existem problemas e todas as instâncias possuem o monitoramento ativado (OK).
+- Críticos (CRITICO): 0
+- Médios (MEDIO): 1
+- Alertas (ALERTA): 21
+- Perigosos (PERIGOS): 0
 
-**Security Groups:** Nenhuma porta perigosa está aberta (OK).
+===========================
+SEÇÃO SEGURANÇA GROUPS
+===========================
 
-**Permissões IAM:** Carlos possui permissão AdministratorAccess (Médio):
-- Riscos: Acesso excessivo por parte de um usuário, que pode criar um risco significativo para a integridade, confidentialidade e disponibilidade dos recursos da empresa.
-- Ações corretivas recomendadas: Examinar as políticas IAM atualmente implementadas, revisar as permissões de acesso do usuário Carlos e garantir a implementação de um mínimo de privilégios necessários (Principio de menos privilégios).
+[OK] Nenhuma porta perigosa aberta
 
-**Logs CloudTrail:** Em uma 24h de perfil, houve 19 operações suspeitas por parte do utilizador Carlos (ALERTA):
-- Riscos: Excesso e uso indevido dos logs de auditoria, que podem resultar em uma violação da proteção dos dados sensíveis.
-- Ações corretivas recomendadas: Realizar uma análise detalhada das operações suspeitas, identificando possíveis atividades maliciosas e tomar medidas de segurança adicionais, como inserção de política na CloudTrail para auditar a sua própria política.
+=======================
+MONITORAMENTO EC2
+=======================
 
-**Autenticação e Chaves (OWASP A07):** Não existem problemas na autenticação e chaves de acesso (OK).
+[OK] Todas as instâncias com monitoramento ativado
 
-**Buckets S3:**
-- aws-cloudtrail-logs-473786254575-8cdea241: privado e criptografia ativada (OK); teste-secaudit-ai: privado e criptografia ativada (OK).
+=========================
+PERMISSÕES IAM (INFORMAÇÕES SENSÍVEIS)
+=========================
 
-**Obs:** Verifique que a prática de segurança do OWASP não está mais completa, pois o relatório apresentado não possui dados necessários para essa verificação.
+[MEDIO] Problema: Carlos tem o nível AdministratorAccess. Isso significa que ele pode executar qualquer ação no nosso ambiente AWS, e caso as suas permissões não sejam adequadamente controladas, isto pode representar um risco significativo para a segurança da empresa.
+
+Risco associado: MEDIO - Uma violação deste tipo de permissão pode resultar em uma vulnerabilidade significativa ou ponto de entrada para potenciais ataques amigóides, se um usuário com estas permissões forem comprometidos por hackers.
+
+=========================
+LOGS CLOUDTRAIL — ÚLTIMAS 24H (OWASP A09)
+=========================
+
+[ALERTA] LookupEvents por Carlos em horário suspeito (2026-05-23 04:19:16-03:00)
+Risco associado: ALERTA - Está claro que este evento é suspicaosamente alto de atividade em um período que está fora do horário comercial. A análise detalhada deste evento pode revelar uma tentativa fracassada de ataque, uma ação não autorizada ou o uso impropriório das permissões.
+
+[ALERTA] AssumeRole por sistema em horário suspeito (2026-05-23 04:17:25-03:00)
+Risco associado: ALERTA - Uma tentativa de assumir papéis é uma indicação potencial de um tentativo de pirataria, já que podem ser usadas para acessar recursos privados. É importante analisar se este evento foi necessário e verificar se todo o processo de controle das permissões está adequado.
+
+<Continua...>
+
+[ALERTA] ListDomains por resource-explorer-2 em horário suspeito (2026-05-23 04:10:35-03:00)
+Risco associado: ALERTA - Esta API não é usada frequentemente no contexto da nossa empresa, então é necessário checar se este uso está legitimamente previsto.
+
+[<Continua>]
+
+[ALERTA] ...
+
+===========================
+AUTENTICAÇÃO E CHAVES (OWASP A07)
+===========================
+
+[OK] Nenhuma chave de acesso com problemas
+
+===========================
+BUCKETS S3
+===========================
+
+[MEDIO/ALERTA] aws-cloudtrail-logs-\* (todos) são visíveis pelo público, privados e possuem criptografia ativada. É recomendado que os registros sejam sempre mantidos em privado para garantir a segurança do nosso ambiente AWS.
+- aws-cloudtrail-logs-473786254575-8cdea241, aws-cloudtrail-logs-\* privados e com criptografia ativada => [MEDIO]
+- aws-cloudtrail-logs-\* públicos, se não possuírem criptografia ativada ou invisíveis ao público => [ALERTA]
