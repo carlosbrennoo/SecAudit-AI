@@ -1,12 +1,12 @@
 # SecAudit AI
 
-Ferramenta que analisa a segurança da sua conta AWS automaticamente e gera um relatório em português usando Inteligência Artificial local. Sem chave de API, sem custo, sem limite — você roda, ela te fala o que está errado e o que fazer.
+Ferramenta que analisa a segurança da sua conta AWS automaticamente e gera um relatório em português usando Inteligência Artificial local. Sem chave de API, sem custo, sem limite - você roda, ela te fala o que está errado e o que fazer.
 
 ---
 
 ## A ideia
 
-Configurar segurança na AWS é cheio de detalhe. Bucket público por acidente, usuário com mais permissão do que devia, porta aberta que não deveria estar — isso acontece o tempo todo, inclusive em empresas grandes.
+Configurar segurança na AWS é cheio de detalhe. Bucket público por acidente, usuário com mais permissão do que devia, porta aberta que não deveria estar - isso acontece o tempo todo, inclusive em empresas grandes.
 
 O SecAudit AI entra na sua conta, vasculha tudo isso automaticamente e em paralelo, e usa uma IA rodando no seu próprio computador pra escrever um relatório em português que qualquer pessoa consegue entender.
 
@@ -23,10 +23,10 @@ Verifica se algum usuário tem acesso de administrador sem precisar. Menos permi
 **Security Groups**
 Detecta portas perigosas abertas pra internet, como a porta 22 (SSH) e 3389 (RDP). Porta aberta errada é porta de entrada pra invasor.
 
-**Autenticação — OWASP A07**
+**Autenticação - OWASP A07**
 Verifica se usuários estão sem MFA ativado e se alguma chave de acesso está ativa há mais de 90 dias sem ser trocada. Chave velha é chave vulnerável.
 
-**Logs CloudTrail — OWASP A09**
+**Logs CloudTrail - OWASP A09**
 Analisa os eventos das últimas 24 horas e detecta criação ou deleção de usuários, acessos de IPs públicos suspeitos, tentativas de login falhadas, ações em horário suspeito e uso do usuário root.
 
 **Monitoramento EC2**
@@ -47,7 +47,7 @@ with ThreadPoolExecutor(max_workers=6) as executor:
 
 **Relatório com IA local via Ollama**
 
-Depois da auditoria, todos os resultados são estruturados por seção e enviados pro Mistral rodando localmente via Ollama — sem internet, sem chave de API, sem custo:
+Depois da auditoria, todos os resultados são estruturados por seção e enviados pro Mistral rodando localmente via Ollama - sem internet, sem chave de API, sem custo:
 
 ```python
 client = OpenAI(
@@ -118,11 +118,11 @@ O relatório aparece no terminal e é salvo em `relatorio.txt`.
 
 ## Tecnologias
 
-- **Python** — linguagem principal
-- **boto3** — SDK oficial da AWS pra Python
-- **ThreadPoolExecutor** — análise paralela dos módulos
-- **Ollama + Mistral** — IA local, gratuita e sem limite
-- **python-dotenv** — gerenciamento seguro de credenciais
+- **Python** - linguagem principal
+- **boto3** - SDK oficial da AWS pra Python
+- **ThreadPoolExecutor** - análise paralela dos módulos
+- **Ollama + Mistral** - IA local, gratuita e sem limite
+- **python-dotenv** - gerenciamento seguro de credenciais
 
 ---
 
