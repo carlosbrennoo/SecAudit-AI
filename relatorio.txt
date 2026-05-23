@@ -1,3 +1,30 @@
-**Relatório de Auditoria AWS:**
+ **Relatório de Auditoria de Segurança AWS**
 
-A auditoria não encontrou problemas críticos, mas identificou um problema médio: o usuário "Carlos" possui acesso total. Foram registrados 43 alertas
+**Resumo Executivo:**
+O relatório apresenta uma quantidade total de 19 itens que se encaixam dentro dos níveis de alarme (18) e médio (1). Não existem itens críticos ou perigosos. É urgentemente necessário analisar detalhadamente os acontecimentos suspeitos registrados no log CloudTrail e tomar medidas para reduzir a exposição de recursos e acesso de usuários de forma precária.
+
+**Detalhamento por seção:**
+
+=== Security Groups ===
+- [OK] Nenhuma porta perigosa aberta nenhum dos security groups analisados. Segurança é considerada boa na configuração dessa seção.
+
+=== Monitoramento EC2 ===
+- [OK] Todas as instâncias com monitoramento ativado, o que mostra que o sistema está seguranço e está sendo observado adequadamente.
+
+=== Permissões IAM ===
+- [MEDIO] O usuário Carlos tem acesso AdministratorAccess, uma permissão de administração extremamente poderosa. Esse nível de permissão pode representar um risco potencial para a segurança da plataforma se o usuário não estiver seguindo práticas de segurança rigorosas.
+
+=== Logs CloudTrail (últimas 24h) ===
+- [ALERTA] A maioria dos acontecimentos no log CloudTrail apresenta operações realizadas em tempos suspeitos, com a grande maioria deles sendo por um usuário chamado Carlos. Essas operações podem indicar infiltração ou atividade mal-intencionada, e devem ser investigadas urgentemente.
+
+=== Autenticação e Chaves (OWASP A07) ===
+- [OK] Nenhuma chave de acesso apresenta problemas em relação à sua segurança. Essa configuração é considerada boa e não requer intervenção imediata.
+
+=== Buckets S3 ===
+- [OK] Os buckets aws-cloudtrail-logs-473786254575-8cdea241 e teste-secaudit-ai apresentam configurações de segurança adequadas, sendo privados e com a criptografia ativada.
+
+**Ações Corretivas Recomendadas:**
+
+1. Revisão das permissões de usuários - Desaconselhável que Carlos tenha acesso AdministratorAccess. Esse nível de permissão deveria ser revisto e reduzido imediatamente, com permissões mais limitadas sendo concedidas ao necessário.
+2. Análise forense do log CloudTrail - É urgente tomar medidas para investigar as operações suspeitas realizadas em horários suspeitos e tentar descobrir a origem e finalidade delas. Atenção especial deve ser dada ao fato de haver muitos de tais eventos ocorrendo por Carlos.
+3. Monitoramento contínuo - Realizar monitoramento constante da segurança da plataforma AWS, a fim de detectar e respondere às atividades suspeitas ou anormalmente rápidas com eficiência.

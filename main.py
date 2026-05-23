@@ -1,24 +1,13 @@
 import boto3
-from mangaba import Agent, Task, Crew, Process
-import datetime
-from datetime import datetime, timezone
+from openai import OpenAI
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 import os
-from datetime import timedelta
+
 load_dotenv()
-encontrou = False
 
-"""Abaixo tem onde o codigo vai pegar as credenciais, cria no seu editor um arquivo chamado ".env" e põe isso nele: 
-
-    GEMINI_KEY=sua_chave_gemini_aqui
-    AWS_KEY=sua_chave_aws_aqui
-    AWS_SECRET=sua_chave_secreta_aws_aqui
-
-E substitua os valores pelas suas chaves. O código vai ler essas variáveis de ambiente e usar para acessar a API do Gemini e da AWS. Nunca compartilhe essas chaves publicamente! Elas dão acesso total à sua conta. Se alguém tiver acesso a elas, pode causar muitos danos. Mantenha-as seguras e privadas.
-"""
-
-GEMINI_KEY = os.getenv('GEMINI_KEY')
-AWS_KEY = os.getenv('AWS_KEY')
+AWS_KEY    = os.getenv('AWS_KEY')
 AWS_SECRET = os.getenv('AWS_SECRET')
 
 session = boto3.Session(
@@ -27,245 +16,308 @@ session = boto3.Session(
     region_name='us-east-1'
 )
 
-resultados = []
+# ─────────────────────────────────────────────
+# Cada função retorna (secao, [resultados])
+# ─────────────────────────────────────────────
 
-print("*** Analisando Buckets S3 ***\n")
-s3 = session.client('s3')
-resposta = s3.list_buckets()
-encontrou = False
-for bucket in resposta['Buckets']:
-    nome = bucket['Name']
+def verificar_s3():
+    resultados = []
+    s3 = session.client('s3')
+    print("[S3] Iniciando análise...")
     try:
-        acl = s3.get_bucket_acl(Bucket=nome)
-        publico = False
-        for permissao in acl['Grants']:
-            if 'URI' in permissao['Grantee']:
-                if 'AllUsers' in permissao['Grantee']['URI']:
+        resposta = s3.list_buckets()
+        for bucket in resposta['Buckets']:
+            nome = bucket['Name']
+            try:
+                try:
+                    config = s3.get_public_access_block(Bucket=nome)
+                    block = config['PublicAccessBlockConfiguration']
+                    publico = not all([
+                        block.get('BlockPublicAcls', False),
+                        block.get('IgnorePublicAcls', False),
+                        block.get('BlockPublicPolicy', False),
+                        block.get('RestrictPublicBuckets', False),
+                    ])
+                except Exception:
                     publico = True
-        if publico:
-            msg = f"[CRITICO] {nome} esta PUBLICO"
-        else:
-            msg = f"TUDO CERTO! {nome} esta privado"
-        print(msg)
-        resultados.append(msg)
-        encontrou = True
-        try:
-            criptografia = s3.get_bucket_encryption(Bucket=nome)
-            msg = f"TUDO CERTO! {nome} tem criptografia ativada"
-            print(msg)
-            resultados.append(msg)
-        except:
-            msg = f"[MEDIO] {nome} sem criptografia ativada"
-            print(msg)
-            resultados.append(msg)
+                msg = f"[CRITICO] {nome} está PÚBLICO" if publico else f"[OK] {nome} está privado"
+                resultados.append(msg)
+                try:
+                    s3.get_bucket_encryption(Bucket=nome)
+                    resultados.append(f"[OK] {nome} tem criptografia ativada")
+                except Exception:
+                    resultados.append(f"[MEDIO] {nome} sem criptografia ativada")
+            except Exception as e:
+                resultados.append(f"[ERRO] {nome}: {e}")
+        if not resultados:
+            resultados.append("[OK] Nenhum bucket encontrado")
     except Exception as e:
-        print(f"ALGO ERRADO, {nome}: {e}")
-if not encontrou:
-    resultados.append("S3: nenhum bucket encontrado")
+        resultados.append(f"[ERRO] Falha ao listar buckets: {e}")
+    print("[S3] Concluído.")
+    return "Buckets S3", resultados
 
-print("\n*** Analisando Usuarios IAM ***\n")
-iam = session.client('iam')
-usuarios = iam.list_users()
-encontrou = False
-for usuario in usuarios['Users']:
-    nome = usuario['UserName']
-    policies = iam.list_attached_user_policies(UserName=nome)
-    for policy in policies['AttachedPolicies']:
-        if policy['PolicyName'] == 'AdministratorAccess':
-            msg = f"[MEDIO] {nome} tem acesso total"
-            print(msg)
-            resultados.append(msg)
-            encontrou = True
-    if not policies['AttachedPolicies']:
-        msg = f"TUDO CERTO! {nome} sem policies diretas"
-        print(msg)
-        resultados.append(msg)
-        encontrou = True
-if not encontrou:
-    msg = "Tudo certo por aqui! Nenhum usuario com acesso indevido"
-    print(msg)
-    resultados.append(msg)
 
-print("\n *** Analisando chaves de acesso ***\n")
-credenciais = iam.list_users()
-for usuario in credenciais['Users']:
-    nome = usuario['UserName']
-    mfa = iam.list_mfa_devices(UserName=nome)
-    if not mfa['MFADevices']:
-        msg = f"PERIGO! {nome} não tem MFA ativado"
-        print(msg)
-        resultados.append(msg)
-        encontrou = True
-    chaves = iam.list_access_keys(UserName=nome)
-    for chave in chaves['AccessKeyMetadata']:
-        if chave['Status'] == 'Active':
-            data_criacao = chave['CreateDate']
-            agora = datetime.now(timezone.utc)
-            idade = (agora - data_criacao).days
-            if idade > 90:
-                msg = f"PERIGO! {nome} tem chave ativa com {idade} dias"
-                print(msg)
-                resultados.append(msg)
-                encontrou = True
-if not encontrou:
-    msg = "Tudo certo por aqui! Nenhuma chave de acesso com problemas"
-    print(msg)
-    resultados.append(msg)
+def verificar_iam():
+    resultados = []
+    iam = session.client('iam')
+    print("[IAM] Iniciando análise...")
+    try:
+        paginator = iam.get_paginator('list_users')
+        encontrou = False
+        for page in paginator.paginate():
+            for usuario in page['Users']:
+                nome = usuario['UserName']
+                policies = iam.list_attached_user_policies(UserName=nome)
+                for policy in policies['AttachedPolicies']:
+                    if policy['PolicyName'] == 'AdministratorAccess':
+                        resultados.append(f"[MEDIO] {nome} tem AdministratorAccess")
+                        encontrou = True
+                if not policies['AttachedPolicies']:
+                    resultados.append(f"[OK] {nome} sem policies diretas")
+                    encontrou = True
+        if not encontrou:
+            resultados.append("[OK] Nenhum usuário com acesso indevido")
+    except Exception as e:
+        resultados.append(f"[ERRO] {e}")
+    print("[IAM] Concluído.")
+    return "Permissões IAM", resultados
 
-print("\n*** Analisando Security Groups ***\n")
-ec2 = session.client('ec2')
-grupos = ec2.describe_security_groups()
-encontrou = False
-for grupo in grupos['SecurityGroups']:
-    nome = grupo['GroupName']
-    for regra in grupo['IpPermissions']:
-        for ip in regra.get('IpRanges', []):
-            if ip['CidrIp'] == '0.0.0.0/0':
-                porta = regra.get('FromPort', 'todas')
-                msg = f"PERIGO! {nome} com porta {porta} aberta"
-                print(msg)
-                resultados.append(msg)
-                encontrou = True
-if not encontrou:
-    msg = "Tudo certo por aqui! Nenhuma porta perigosa aberta"
-    print(msg)
-    resultados.append(msg)
 
-print("\n*** Analisando logs do CloudTrail ***\n")
-cloudtrail = session.client('cloudtrail')
-logs = cloudtrail.list_trails()
-encontrou = False
+def verificar_chaves():
+    resultados = []
+    iam = session.client('iam')
+    print("[CHAVES] Iniciando análise...")
+    try:
+        paginator = iam.get_paginator('list_users')
+        encontrou = False
+        agora = datetime.now(timezone.utc)
+        for page in paginator.paginate():
+            for usuario in page['Users']:
+                nome = usuario['UserName']
+                mfa = iam.list_mfa_devices(UserName=nome)
+                if not mfa['MFADevices']:
+                    resultados.append(f"[PERIGO] {nome} sem MFA ativado")
+                    encontrou = True
+                chaves = iam.list_access_keys(UserName=nome)
+                for chave in chaves['AccessKeyMetadata']:
+                    if chave['Status'] == 'Active':
+                        idade = (agora - chave['CreateDate']).days
+                        if idade > 90:
+                            resultados.append(f"[PERIGO] {nome} tem chave ativa com {idade} dias sem rotação")
+                            encontrou = True
+        if not encontrou:
+            resultados.append("[OK] Nenhuma chave de acesso com problemas")
+    except Exception as e:
+        resultados.append(f"[ERRO] {e}")
+    print("[CHAVES] Concluído.")
+    return "Autenticação e Chaves (OWASP A07)", resultados
 
-inicio = datetime.now(timezone.utc) - timedelta(hours=24)
 
-eventos = cloudtrail.lookup_events(
-    StartTime=inicio
-)
-eventos_registrados = set()
-eventos_registrados = set()
+def verificar_security_groups():
+    resultados = []
+    ec2 = session.client('ec2')
+    print("[SG] Iniciando análise...")
+    try:
+        grupos = ec2.describe_security_groups()
+        encontrou = False
+        for grupo in grupos['SecurityGroups']:
+            nome = grupo['GroupName']
+            for regra in grupo['IpPermissions']:
+                for ip in regra.get('IpRanges', []):
+                    if ip['CidrIp'] == '0.0.0.0/0':
+                        porta = regra.get('FromPort', 'todas')
+                        resultados.append(f"[PERIGO] Security Group '{nome}' com porta {porta} aberta para 0.0.0.0/0")
+                        encontrou = True
+        if not encontrou:
+            resultados.append("[OK] Nenhuma porta perigosa aberta")
+    except Exception as e:
+        resultados.append(f"[ERRO] {e}")
+    print("[SG] Concluído.")
+    return "Security Groups", resultados
 
-for evento in eventos['Events']:
-    nome_evento = evento['EventName']
-    usuario = evento.get('Username', 'sistema')
-    horario = evento['EventTime']
-    hora = horario.hour
-    ip = evento.get('SourceIPAddress', '')
 
-    # eventos suspeitos de IAM
-    if nome_evento in ['CreateUser', 'DeleteUser', 'AttachUserPolicy', 'DetachUserPolicy']:
-        chave = f"iam-{nome_evento}-{usuario}"
-        if chave not in eventos_registrados:
-            eventos_registrados.add(chave)
-            msg = f"ALERTA! Evento {nome_evento} por {usuario}"
-            print(msg)
-            resultados.append(msg)
-            encontrou = True
+def verificar_cloudtrail():
+    resultados = []
+    cloudtrail = session.client('cloudtrail')
+    print("[CLOUDTRAIL] Iniciando análise...")
+    try:
+        inicio = datetime.now(timezone.utc) - timedelta(hours=24)
+        eventos = cloudtrail.lookup_events(StartTime=inicio)
+        registrados = set()
+        encontrou = False
 
-    # IP publico suspeito
-    if ip and not (ip.startswith('192.168') or ip.startswith('10.') or ip.startswith('172.16')):
-        chave = f"ip-{ip}-{nome_evento}"
-        if chave not in eventos_registrados:
-            eventos_registrados.add(chave)
-            msg = f"ALERTA! Acesso de IP publico: {ip} por {usuario}"
-            print(msg)
-            resultados.append(msg)
-            encontrou = True
+        EVENTOS_IAM_SUSPEITOS = {
+            'CreateUser', 'DeleteUser', 'AttachUserPolicy', 'DetachUserPolicy'
+        }
 
-    # tentativa de login falhada
-    if nome_evento == 'ConsoleLogin':
-        detalhes = evento.get('CloudTrailEvent', '')
-        if '"errorMessage": "Failed authentication"' in detalhes:
-            chave = f"login-{usuario}"
-            if chave not in eventos_registrados:
-                eventos_registrados.add(chave)
-                msg = f"ALERTA! Tentativa de login falhada por {usuario}"
-                print(msg)
-                resultados.append(msg)
-                encontrou = True
+        for evento in eventos['Events']:
+            nome_evento = evento['EventName']
+            usuario     = evento.get('Username', 'sistema')
+            horario     = evento['EventTime']
+            hora        = horario.hour
+            ip          = evento.get('SourceIPAddress', '')
 
-    # horario suspeito — só registra se ainda nao foi registrado como root
-    # horario suspeito ou root
-    if hora >= 0 and hora <= 6 or usuario == 'root':
-        chave = f"suspeito-{nome_evento}-{usuario}"
-        if chave not in eventos_registrados:
-            eventos_registrados.add(chave)
-            if usuario == 'root' and hora >= 0 and hora <= 6:
-                msg = f"ALERTA! Evento {nome_evento} por root em horario suspeito: {horario}"
-            elif usuario == 'root':
-                msg = f"ALERTA! Evento {nome_evento} por usuario root"
-            else:
-                msg = f"ALERTA! Evento {nome_evento} por {usuario} em horario suspeito: {horario}"
-            print(msg)
-            resultados.append(msg)
-            encontrou = True
-if not encontrou:
-    msg = "Tudo certo por aqui! Nenhum evento suspeito nas ultimas 24 horas"
-    print(msg)
-    resultados.append(msg)
+            if nome_evento in EVENTOS_IAM_SUSPEITOS:
+                chave = f"iam-{nome_evento}-{usuario}"
+                if chave not in registrados:
+                    registrados.add(chave)
+                    resultados.append(f"[ALERTA] Evento IAM sensível: {nome_evento} executado por {usuario}")
+                    encontrou = True
 
-print("\n*** Verificando monitoramento e alertas ***\n")
-ec2 = session.client('ec2')
-instancias = ec2.describe_instances()
-encontrou = False
-for reserva in instancias['Reservations']:
-    for instancia in reserva['Instances']:
-        id = instancia['InstanceId']
-        nome = next((tag['Value'] for tag in instancia.get('Tags', []) if tag['Key'] == 'Name'), id)
-        if 'Monitoring' in instancia and instancia['Monitoring']['State'] != 'enabled':
-            msg = f"SE LIGA! {nome} com monitoramento desativado"
-            print(msg)
-            resultados.append(msg)
-            encontrou = True
-if not encontrou:
-    msg = "Tudo certo por aqui! Todas as instancias com monitoramento ativado"
-    print(msg)
-    resultados.append(msg)
+            if ip and not any(ip.startswith(p) for p in ('192.168', '10.', '172.16')):
+                chave = f"ip-{ip}-{nome_evento}"
+                if chave not in registrados:
+                    registrados.add(chave)
+                    resultados.append(f"[ALERTA] Acesso de IP público {ip} — evento: {nome_evento} por {usuario}")
+                    encontrou = True
+
+            if nome_evento == 'ConsoleLogin':
+                detalhes = evento.get('CloudTrailEvent', '')
+                if '"errorMessage": "Failed authentication"' in detalhes:
+                    chave = f"login-{usuario}"
+                    if chave not in registrados:
+                        registrados.add(chave)
+                        resultados.append(f"[ALERTA] Tentativa de login falhada por {usuario}")
+                        encontrou = True
+
+            if (0 <= hora <= 6) or usuario == 'root':
+                chave = f"suspeito-{nome_evento}-{usuario}"
+                if chave not in registrados:
+                    registrados.add(chave)
+                    if usuario == 'root' and (0 <= hora <= 6):
+                        msg = f"[ALERTA] {nome_evento} pelo usuário root em horário suspeito ({horario})"
+                    elif usuario == 'root':
+                        msg = f"[ALERTA] {nome_evento} executado pelo usuário root"
+                    else:
+                        msg = f"[ALERTA] {nome_evento} por {usuario} em horário suspeito ({horario})"
+                    resultados.append(msg)
+                    encontrou = True
+
+        if not encontrou:
+            resultados.append("[OK] Nenhum evento suspeito nas últimas 24 horas")
+    except Exception as e:
+        resultados.append(f"[ERRO] {e}")
+    print("[CLOUDTRAIL] Concluído.")
+    return "Logs CloudTrail — últimas 24h (OWASP A09)", resultados
+
+
+def verificar_ec2():
+    resultados = []
+    ec2 = session.client('ec2')
+    print("[EC2] Iniciando análise...")
+    try:
+        paginator = ec2.get_paginator('describe_instances')
+        encontrou = False
+        for page in paginator.paginate():
+            for reserva in page['Reservations']:
+                for inst in reserva['Instances']:
+                    inst_id = inst['InstanceId']
+                    nome = next(
+                        (tag['Value'] for tag in inst.get('Tags', []) if tag['Key'] == 'Name'),
+                        inst_id
+                    )
+                    if inst.get('Monitoring', {}).get('State') != 'enabled':
+                        resultados.append(f"[MEDIO] Instância '{nome}' com monitoramento desativado")
+                        encontrou = True
+        if not encontrou:
+            resultados.append("[OK] Todas as instâncias com monitoramento ativado")
+    except Exception as e:
+        resultados.append(f"[ERRO] {e}")
+    print("[EC2] Concluído.")
+    return "Monitoramento EC2", resultados
+
+
+# ─────────────────────────────────────────────
+# Execução paralela
+# ─────────────────────────────────────────────
+
+VERIFICACOES = {
+    "S3":              verificar_s3,
+    "IAM":             verificar_iam,
+    "Chaves":          verificar_chaves,
+    "Security Groups": verificar_security_groups,
+    "CloudTrail":      verificar_cloudtrail,
+    "EC2":             verificar_ec2,
+}
+
+print("*** SecAudit AI — Iniciando auditoria paralela ***\n")
+
+secoes = {}
+
+with ThreadPoolExecutor(max_workers=6) as executor:
+    futures = {executor.submit(fn): nome for nome, fn in VERIFICACOES.items()}
+    for future in as_completed(futures):
+        try:
+            secao, resultados = future.result()
+            secoes[secao] = resultados
+        except Exception as e:
+            secoes["Erro"] = [f"[ERRO] {e}"]
+
+# ─────────────────────────────────────────────
+# Montar dados estruturados por seção
+# ─────────────────────────────────────────────
 
 print("\n*** Análise completa! Gerando relatório ***\n")
 
-criticos = [r for r in resultados if '[CRITICO]' in r]
-medios = [r for r in resultados if '[MEDIO]' in r]
-alertas = [r for r in resultados if 'ALERTA' in r]
+todas_as_linhas = []
+for secao, itens in secoes.items():
+    todas_as_linhas.append(f"\n=== {secao} ===")
+    for item in itens:
+        todas_as_linhas.append(f"  {item}")
 
-dados = f"""Resumo da auditoria AWS:
-- Problemas criticos: {len(criticos)}
-- Problemas medios: {len(medios)}
-- Alertas: {len(alertas)}
+dados_estruturados = "\n".join(todas_as_linhas)
 
-Criticos: {', '.join(criticos) if criticos else 'nenhum'}
-Medios: {', '.join(medios) if medios else 'nenhum'}
-Alertas: {', '.join(alertas) if alertas else 'nenhum'}"""
+todos    = [item for itens in secoes.values() for item in itens]
+criticos = [r for r in todos if '[CRITICO]' in r]
+medios   = [r for r in todos if '[MEDIO]'   in r]
+alertas  = [r for r in todos if '[ALERTA]'  in r]
+perigos  = [r for r in todos if '[PERIGO]'  in r]
 
-analista = Agent(
-    role="Analista de Segurança",
-    goal="Analisar resultados de auditoria AWS e gerar relatório claro em português",
-    backstory="Especialista em segurança cloud com 10 anos de experiência",
-    llm="google",
-    api_key=GEMINI_KEY
-    
+resumo = f"""RESUMO GERAL:
+- Críticos : {len(criticos)}
+- Médios   : {len(medios)}
+- Alertas  : {len(alertas)}
+- Perigos  : {len(perigos)}
+"""
+
+dados_finais = resumo + dados_estruturados
+
+# ─────────────────────────────────────────────
+# Relatório via Ollama (local, gratuito)
+# ─────────────────────────────────────────────
+
+print("Conectando ao Ollama local...\n")
+
+client = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
 )
 
-
-if len(dados) > 1500:
-    dados = dados[:1500] + "\n... (resultados resumidos)"
-
-tarefa = Task(
-    description=f"Com base nesses resultados de auditoria AWS, escreva um relatório claro em português com no máximo 8 linhas. Diga o que foi encontrado e se há algum problema. Não deixe perder informações. Resultados:\n\n{dados}",
-    expected_output="Relatório completo de segurança em português",
-    agent=analista
+prompt = (
+    "Você é um analista de segurança cloud com 10 anos de experiência. "
+    "Escreva APENAS em português do Brasil, com linguagem clara e profissional. "
+    "Nunca use inglês. "
+    "Você recebeu os resultados de uma auditoria de segurança AWS organizados por seção. "
+    "Escreva um relatório completo em português com as seguintes partes:\n"
+    "1. Resumo executivo (visão geral dos problemas)\n"
+    "2. Detalhamento por seção — explique cada problema encontrado e o risco associado\n"
+    "3. Ações corretivas recomendadas — objetivas e ordenadas por prioridade\n"
+    "Não omita nenhum item. Use os prefixos [CRITICO], [PERIGO], [ALERTA], [MEDIO] e [OK] "
+    "para referenciar cada item.\n\n"
+    f"{dados_finais}"
 )
 
-
-crew = Crew(
-    agents=[analista],
-    tasks=[tarefa],
-    process=Process.SEQUENTIAL
+response = client.chat.completions.create(
+    model="mistral",
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=8192
 )
 
-resultado = crew.kickoff()
-print(resultado.final_output)
+relatorio = response.choices[0].message.content
+
+print(relatorio)
 
 with open("relatorio.txt", "w", encoding="utf-8") as f:
-    f.write(resultado.final_output)
+    f.write(relatorio)
 
 print("\nRelatório salvo em relatorio.txt")
