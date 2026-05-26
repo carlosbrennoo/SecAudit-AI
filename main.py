@@ -16,9 +16,6 @@ session = boto3.Session(
     region_name='us-east-1'
 )
 
-# ─────────────────────────────────────────────
-# Cada função retorna (secao, [resultados])
-# ─────────────────────────────────────────────
 
 def verificar_s3():
     resultados = []
@@ -227,9 +224,9 @@ def verificar_ec2():
     return "Monitoramento EC2", resultados
 
 
-# ─────────────────────────────────────────────
+
 # Execução paralela
-# ─────────────────────────────────────────────
+
 
 VERIFICACOES = {
     "S3":              verificar_s3,
@@ -253,9 +250,9 @@ with ThreadPoolExecutor(max_workers=6) as executor:
         except Exception as e:
             secoes["Erro"] = [f"[ERRO] {e}"]
 
-# ─────────────────────────────────────────────
+
 # Montar dados estruturados por seção
-# ─────────────────────────────────────────────
+
 
 print("\n*** Análise completa! Gerando relatório ***\n")
 
@@ -282,9 +279,8 @@ resumo = f"""RESUMO GERAL:
 
 dados_finais = resumo + dados_estruturados
 
-# ─────────────────────────────────────────────
+
 # Relatório via Ollama (local, gratuito)
-# ─────────────────────────────────────────────
 
 print("Conectando ao Ollama local...\n")
 
@@ -303,7 +299,7 @@ prompt = (
     "2. Detalhamento por seção — explique cada problema encontrado e o risco associado\n"
     "3. Ações corretivas recomendadas — objetivas e ordenadas por prioridade\n"
     "Não omita nenhum item. Use os prefixos [CRITICO], [PERIGO], [ALERTA], [MEDIO] e [OK] "
-    "para referenciar cada item.\n\n"
+    "para referenciar cada item.\n\n"   
     f"{dados_finais}"
 )
 
