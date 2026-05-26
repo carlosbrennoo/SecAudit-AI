@@ -1,62 +1,36 @@
- RELATÓRIO DE AVALIAÇÃO DE SEGURANÇA AWS
-==========================================
+ **Relatório de Auditoria de Segurança AWS**
 
-RESUMENOS GERAL:
+Olá,
 
-- Críticos (CRITICO): 0
-- Médios (MEDIO): 1
-- Alertas (ALERTA): 21
-- Perigosos (PERIGOS): 0
+Eu tenho o prazer de apresentar o relatório de auditoria de segurança realizado em nosso ambiente AWS. A seguir, encontram-se as informações detalhadas por seção.
 
-===========================
-SEÇÃO SEGURANÇA GROUPS
-===========================
+**Resumo Executivo:**
+- Críticos: 0
+- Médios: 1
+- Alertas: 0
+- Perigos: 0
 
-[OK] Nenhuma porta perigosa aberta
+**Monitoramento EC2**
+[OK] Todas as instâncias possuem monitoramento ativado.
 
-=======================
-MONITORAMENTO EC2
-=======================
+**Permissões IAM**
+[MEDIO] Carlos possui Permissões AdministratorAccess, o que representa um risco potencial de acesso descontrolado a recursos AWS em caso de comprometimento da conta associada.
 
-[OK] Todas as instâncias com monitoramento ativado
+**Security Groups**
+[OK] Nenhuma porta perigosa esta aberta.
 
-=========================
-PERMISSÕES IAM (INFORMAÇÕES SENSÍVEIS)
-=========================
+**Autenticação e Chaves (OWASP A07)**
+[OK] Nenhuma chave de acesso possuí problemas conhecidos.
 
-[MEDIO] Problema: Carlos tem o nível AdministratorAccess. Isso significa que ele pode executar qualquer ação no nosso ambiente AWS, e caso as suas permissões não sejam adequadamente controladas, isto pode representar um risco significativo para a segurança da empresa.
+**Logs CloudTrail — últimas 24h (OWASP A09)**
+[OK] Nenhum evento suspeito foi identificado nas últimas 24 horas.
 
-Risco associado: MEDIO - Uma violação deste tipo de permissão pode resultar em uma vulnerabilidade significativa ou ponto de entrada para potenciais ataques amigóides, se um usuário com estas permissões forem comprometidos por hackers.
+**Buckets S3**
+[OK] aws-cloudtrail-logs-473786254575-8cdea241 está em privacionamento e possui criptografia ativada.
+[OK] teste-secaudit-ai também se encontra em privacionamento e possui criptografia ativada.
 
-=========================
-LOGS CLOUDTRAIL — ÚLTIMAS 24H (OWASP A09)
-=========================
+**Ações Corretivas Recomendadas:**
 
-[ALERTA] LookupEvents por Carlos em horário suspeito (2026-05-23 04:19:16-03:00)
-Risco associado: ALERTA - Está claro que este evento é suspicaosamente alto de atividade em um período que está fora do horário comercial. A análise detalhada deste evento pode revelar uma tentativa fracassada de ataque, uma ação não autorizada ou o uso impropriório das permissões.
-
-[ALERTA] AssumeRole por sistema em horário suspeito (2026-05-23 04:17:25-03:00)
-Risco associado: ALERTA - Uma tentativa de assumir papéis é uma indicação potencial de um tentativo de pirataria, já que podem ser usadas para acessar recursos privados. É importante analisar se este evento foi necessário e verificar se todo o processo de controle das permissões está adequado.
-
-<Continua...>
-
-[ALERTA] ListDomains por resource-explorer-2 em horário suspeito (2026-05-23 04:10:35-03:00)
-Risco associado: ALERTA - Esta API não é usada frequentemente no contexto da nossa empresa, então é necessário checar se este uso está legitimamente previsto.
-
-[<Continua>]
-
-[ALERTA] ...
-
-===========================
-AUTENTICAÇÃO E CHAVES (OWASP A07)
-===========================
-
-[OK] Nenhuma chave de acesso com problemas
-
-===========================
-BUCKETS S3
-===========================
-
-[MEDIO/ALERTA] aws-cloudtrail-logs-\* (todos) são visíveis pelo público, privados e possuem criptografia ativada. É recomendado que os registros sejam sempre mantidos em privado para garantir a segurança do nosso ambiente AWS.
-- aws-cloudtrail-logs-473786254575-8cdea241, aws-cloudtrail-logs-\* privados e com criptografia ativada => [MEDIO]
-- aws-cloudtrail-logs-\* públicos, se não possuírem criptografia ativada ou invisíveis ao público => [ALERTA]
+1. **Prioridade Alta** - Gerencie as permissões do usuário Carlos, retirando as permissões de administrador caso não seja necessário e reestruturando-as conforme a necessidade dos recursos que acessa. O risco é descontrolado acesso ao sistema, o que pode representar um aumento substancial em vulnerabilidades.
+2. **Prioridade Média** - Ao longo do tempo, realizar auditorias regulares da configuração de segurança de IAM e Security Groups, para garantir que continuem em conformidade com as melhores práticas de segurança e evitar a ocorrência de eventuais problemas. Isto irá diminuir o risco potencial de comprometimento dos recursos AWS.
+3. **Prioridade Baixa** - Verifique regularmente se os logs CloudTrail seguem sendo gerados e analisados. Este processo será importante para detetação rápida em caso de possíveis intrusões ou atividades suspeitas, reduzindo riscos de segurança e permitindo a toma de decisões corretas para o sistema.
